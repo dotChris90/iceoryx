@@ -1,7 +1,7 @@
 from conans import ConanFile, CMake, tools
 import os
 from conans.tools import load
-import re
+import shutil
 
 def get_version():
     try:
@@ -27,30 +27,35 @@ class IceoryxConan(ConanFile):
     default_options["shared"] = False
     default_options['toml_config'] = False
     exports_sources = ["*"]
-    generators = "cmake"
+    generators = ["cmake"]
+    cmake = None   
+
+    def __adapt_cmakefile(self):
+        tools.replace_in_file("iceoryx_meta/CMakeLists.txt", "project(iceoryx_meta)",
+                              '''project(iceoryx_meta)
+include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+conan_basic_setup()''')
 
     def config_options(self):
         if self.settings.os == "Windows":
             del self.options.fPIC
-        if self.options.toml_config == True:
-            raise NotImplementedError()
 
     def build(self):
-        cmd = "cmake "
-        if self.options.shared:
-            cmd = cmd + " -DBUILD_SHARED_LIBS=ON "
-        cmd = cmd + " -DCMAKE_INSTALL_PREFIX=./target -Bbuild -Hiceoryx_meta -DTOML_CONFIG=OFF"
-        os.system(cmd)
-        cmd = "cmake --build build"
-        os.system(cmd)
-        cmd = "cmake --build build --target install"
-        os.system(cmd)
-        
+        #shutil.copyfile("conanbuildinfo.cmake","iceoryx_meta/conanbuildinfo.cmake")
+        #self.__adapt_cmakefile()
+
+        self.cmake = CMake(self)
+        self.cmake.definitions["CMAKE_INSTALL_PREFIX"]  = "./target"
+        self.cmake.definitions["BUILD_SHARED_LIBS"]     = "ON" if self.options.shared         else "OFF"
+        self.cmake.definitions["TOML_CONFIG"]           = "ON" if self.options.toml_config    else "OFF"
+        self.cmake.configure(build_folder="build",source_folder="iceoryx_meta")
+        self.cmake.build()
 
     def package(self):
-        self.copy("*.hpp",      dst="include",  src="target/include/")
-        self.copy("*.so",       dst="lib",      src="target/lib/")
-        self.copy("*.a",        dst="lib",      src="target/lib/")
+        self.cmake.install()
+        self.copy("*.hpp",      dst="include",  src="build/target/include/")
+        self.copy("*.so",       dst="lib",      src="build/target/lib/")
+        self.copy("*.a",        dst="lib",      src="build/target/lib/")
 
     def package_info(self):
         self.cpp_info.libs = [
