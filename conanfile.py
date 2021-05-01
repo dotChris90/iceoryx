@@ -1,15 +1,16 @@
 from conans import ConanFile, CMake, tools
 import os
 from conans.tools import load
-import shutil
+from pathlib import Path
+
+def get_toml_line():
+    return "add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/cmake/cpptoml/ ${CMAKE_BINARY_DIR}/dependencies/posh/cpptoml/prebuild)"
 
 def get_version():
     try:
-        content = load("VERSION")
-        version = content
-        return version
+        return load("VERSION")
     except Exception as e:
-        return None
+        return "ERROR"
 
 class IceoryxConan(ConanFile):
     name = "iceoryx"
@@ -25,7 +26,7 @@ class IceoryxConan(ConanFile):
     options["shared"] = [True,False]
     default_options = { "fPIC": True}
     default_options["shared"] = False
-    default_options['toml_config'] = False
+    default_options['toml_config'] = True
     exports_sources = ["*"]
     generators = ["cmake"]
     cmake = None   
@@ -33,21 +34,30 @@ class IceoryxConan(ConanFile):
     def __adapt_cmakefile(self):
         tools.replace_in_file("iceoryx_meta/CMakeLists.txt", "project(iceoryx_meta)",
                               '''project(iceoryx_meta)
-include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+include(${CONAN_BUILD_INFO_FILE})
 conan_basic_setup()''')
+
+    def __patch_cmake_toml(self):
+        tools.replace_in_file("iceoryx_posh/CMakeLists.txt", get_toml_line(),
+                              "#" + get_toml_line())
 
     def config_options(self):
         if self.settings.os == "Windows":
             del self.options.fPIC
+        if self.options.toml_config:
+            self.requires("tinytoml/0.4@bincrafters/stable")
 
     def build(self):
-        #shutil.copyfile("conanbuildinfo.cmake","iceoryx_meta/conanbuildinfo.cmake")
-        #self.__adapt_cmakefile()
+        conanbuildinfo_file = str(Path(os.getcwd()).joinpath("conanbuildinfo.cmake").absolute())
+        self.__adapt_cmakefile()
+        if self.options.toml_config:
+            self.__patch_cmake_toml()
 
         self.cmake = CMake(self)
         self.cmake.definitions["CMAKE_INSTALL_PREFIX"]  = "./target"
         self.cmake.definitions["BUILD_SHARED_LIBS"]     = "ON" if self.options.shared         else "OFF"
         self.cmake.definitions["TOML_CONFIG"]           = "ON" if self.options.toml_config    else "OFF"
+        self.cmake.definitions["CONAN_BUILD_INFO_FILE"] = conanbuildinfo_file
         self.cmake.configure(build_folder="build",source_folder="iceoryx_meta")
         self.cmake.build()
 
@@ -56,6 +66,8 @@ conan_basic_setup()''')
         self.copy("*.hpp",      dst="include",  src="build/target/include/")
         self.copy("*.so",       dst="lib",      src="build/target/lib/")
         self.copy("*.a",        dst="lib",      src="build/target/lib/")
+        self.copy("*",          dst="bin",      src="build/target/bin/")
+        self.copy("*",          dst="etc",      src="build/target/etc/")
 
     def package_info(self):
         self.cpp_info.libs = [
