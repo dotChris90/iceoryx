@@ -45,7 +45,7 @@ conan_basic_setup()''')
         if self.settings.os == "Windows":
             del self.options.fPIC
         if self.options.toml_config:
-            self.requires("tinytoml/0.4@bincrafters/stable")
+            raise NotImplementedError()       
 
     def build(self):
         conanbuildinfo_file = str(Path(os.getcwd()).joinpath("conanbuildinfo.cmake").absolute())
