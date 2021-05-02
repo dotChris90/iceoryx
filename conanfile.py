@@ -37,6 +37,12 @@ class IceoryxConan(ConanFile):
 include(${CONAN_BUILD_INFO_FILE})
 conan_basic_setup()''')
 
+    def __add_definitions_of_dependencies(self):
+        if self.options.toml_config:
+            toml_lib    = [folder for idx, folder in enumerate(self.deps_cpp_info.libdirs) if "cpptoml/master" in folder][0]
+            toml_cmkae  = str(Path(toml_lib).joinpath("cmake/cpptoml"))
+            self.cmake.definitions["cpptoml_DIR"] = toml_cmkae
+
     def __patch_cmake_toml(self):
         tools.replace_in_file("iceoryx_posh/CMakeLists.txt", get_toml_line(),
                               "#" + get_toml_line())
@@ -47,7 +53,7 @@ conan_basic_setup()''')
         if self.options.toml_config:
             cmd = "git clone https://github.com/jgsogo/conan-cpptoml.git"
             os.system(cmd)
-            cmd = "cd conan-cpptoml && conan create . "
+            cmd = "cd conan-cpptoml && conan export . "
             os.system(cmd)
             self.requires("cpptoml/master")  
 
@@ -62,6 +68,9 @@ conan_basic_setup()''')
         self.cmake.definitions["BUILD_SHARED_LIBS"]     = "ON" if self.options.shared         else "OFF"
         self.cmake.definitions["TOML_CONFIG"]           = "ON" if self.options.toml_config    else "OFF"
         self.cmake.definitions["CONAN_BUILD_INFO_FILE"] = conanbuildinfo_file
+        
+        self.__add_definitions_of_dependencies()
+        
         self.cmake.configure(build_folder="build",source_folder="iceoryx_meta")
         self.cmake.build()
 
