@@ -45,7 +45,11 @@ conan_basic_setup()''')
         if self.settings.os == "Windows":
             del self.options.fPIC
         if self.options.toml_config:
-            raise NotImplementedError()       
+            cmd = "git clone https://github.com/jgsogo/conan-cpptoml.git"
+            os.system(cmd)
+            cmd = "cd conan-cpptoml && conan create . "
+            os.system(cmd)
+            self.requires("cpptoml/master")  
 
     def build(self):
         conanbuildinfo_file = str(Path(os.getcwd()).joinpath("conanbuildinfo.cmake").absolute())
